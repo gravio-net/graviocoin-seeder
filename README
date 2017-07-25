@@ -1,7 +1,7 @@
-litecoin-seeder
+graviocoin-seeder
 ===============
 
-Litecoin-seeder is a crawler for the Litecoin network, which exposes a list
+Graviocoin-seeder is a crawler for the Graviocoin network, which exposes a list
 of reliable nodes via a built-in DNS server.
 
 Features:
