@@ -290,7 +290,7 @@ extern "C" int GetIPList(void *data, char *requestedHostname, addr_t* addr, int 
   auto& thisflag = thread->perflag[requestedFlags];
   unsigned int size = thisflag.cache.size();
   unsigned int maxmax = (ipv4 ? thisflag.nIPv4 : 0) + (ipv6 ? thisflag.nIPv6 : 0);
-  printf("[!] size = %i, maxmax - %i\n", size, maxmax);
+  //printf("[!] size = %i, maxmax - %i\n", size, maxmax);
   if (max > size)
     max = size;
   if (max > maxmax)
