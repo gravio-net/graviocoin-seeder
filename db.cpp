@@ -167,6 +167,7 @@ void CAddrDb::Add_(const CAddress &addr, bool force) {
 }
 
 void CAddrDb::GetIPs_(set<CNetAddr>& ips, uint64_t requestedFlags, int max, const bool* nets) {
+  printf("[GetIPs]: requestedFlags = %i, max = %i\n", requestedFlags, max);
   if (goodId.size() == 0) {
     int id = -1;
     if (ourId.size() == 0) {

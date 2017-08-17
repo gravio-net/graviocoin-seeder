@@ -290,6 +290,7 @@ extern "C" int GetIPList(void *data, char *requestedHostname, addr_t* addr, int 
   auto& thisflag = thread->perflag[requestedFlags];
   unsigned int size = thisflag.cache.size();
   unsigned int maxmax = (ipv4 ? thisflag.nIPv4 : 0) + (ipv6 ? thisflag.nIPv6 : 0);
+  printf("[!] size = %i, maxmax - %i\n", size, maxmax);
   if (max > size)
     max = size;
   if (max > maxmax)
@@ -383,30 +384,33 @@ extern "C" void* ThreadStats(void*) {
     if (first)
     {
       first = false;
-      printf("\n\n\n\x1b[3A");
+      //printf("\n\n\n\x1b[3A");
     }
-    else
-      printf("\x1b[2K\x1b[u");
-    printf("\x1b[s");
+    //else
+      //printf("\x1b[2K\x1b[u");
+    //printf("\x1b[s");
     uint64_t requests = 0;
     uint64_t queries = 0;
     for (unsigned int i=0; i<dnsThread.size(); i++) {
       requests += dnsThread[i]->dns_opt.nRequests;
       queries += dnsThread[i]->dbQueries;
     }
-    printf("%s %i/%i available (%i tried in %is, %i new, %i active), %i banned; %llu DNS requests, %llu db queries", c, stats.nGood, stats.nAvail, stats.nTracked, stats.nAge, stats.nNew, stats.nAvail - stats.nTracked - stats.nNew, stats.nBanned, (unsigned long long)requests, (unsigned long long)queries);
-    Sleep(1000);
+    printf("%s %i/%i available (%i tried in %is, %i new, %i active), %i banned; %llu DNS requests, %llu db queries\n", c, stats.nGood, stats.nAvail, stats.nTracked, stats.nAge, stats.nNew, stats.nAvail - stats.nTracked - stats.nNew, stats.nBanned, (unsigned long long)requests, (unsigned long long)queries);
+    Sleep(10000);
   } while(1);
   return nullptr;
 }
 
-static const string mainnet_seeds[] = {"dnsseed.graviocoin.net", ""};
-static const string testnet_seeds[] = {"testnet-seed.graviocoin.net", ""};
+static const string mainnet_seeds[] = {"seed.graviotools.net", ""};
+static const string testnet_seeds[] = {"testnet-seed.graviotools.net", ""};
 static const string *seeds = mainnet_seeds;
 
 extern "C" void* ThreadSeeder(void*) {
   if (!fTestNet){
-    db.Add(CService("kjy2eqzk4zwi5zd3.onion", 23333), true);
+    //db.Add(CService("kjy2eqzk4zwi5zd3.onion", 23333), true);
+    db.Add(CAddress(CService("134.0.111.238", 23333), NODE_NETWORK|NODE_BLOOM|NODE_WITNESS), true);
+    db.Add(CAddress(CService("83.166.96.102", 23333), NODE_NETWORK|NODE_BLOOM|NODE_WITNESS), true);
+    db.Add(CAddress(CService("95.47.183.117", 23333), NODE_NETWORK|NODE_BLOOM|NODE_WITNESS), true);
   }
   do {
     for (int i=0; seeds[i] != ""; i++) {

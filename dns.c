@@ -249,22 +249,23 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   // clear error
   outbuf[3] &= ~15;
   // check qr
-  if (inbuf[2] & 128) { /* printf("Got response?\n"); */ error = 1; goto error; }
+  if (inbuf[2] & 128) { printf("Got response?\n"); error = 1; goto error; }
   // check opcode
-  if (((inbuf[2] & 120) >> 3) != 0) { /* printf("Opcode nonzero?\n"); */ error = 4; goto error; }
+  if (((inbuf[2] & 120) >> 3) != 0) { printf("Opcode nonzero?\n"); error = 4; goto error; }
   // unset TC
   outbuf[2] &= ~2;
   // unset RA
   outbuf[3] &= ~128;
   // check questions
   int nquestion = (inbuf[4] << 8) + inbuf[5];
-  if (nquestion == 0) { /* printf("No questions?\n"); */ error = 0; goto error; }
-  if (nquestion > 1) { /* printf("Multiple questions %i?\n", nquestion); */ error = 4; goto error; }
+  if (nquestion == 0) { printf("No questions?\n");  error = 0; goto error; }
+  if (nquestion > 1) { printf("Multiple questions %i?\n", nquestion); error = 4; goto error; }
   const unsigned char *inpos = inbuf + 12;
   const unsigned char *inend = inbuf + insize;
-  char name[256];
+  char name[256] = {0};
   int offset = inpos - inbuf;
   int ret = parse_name(&inpos, inend, inbuf, name, 256);
+  printf("DNS: PRE-request host='%s' opt-host='%s'\n", name, opt->host);
   if (ret == -1) { error = 1; goto error; }
   if (ret == -2) { error = 5; goto error; }
   int namel = strlen(name), hostl = strlen(opt->host);
@@ -287,7 +288,7 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   unsigned char *outpos = outbuf+(inpos-inbuf);
   unsigned char *outend = outbuf + BUFLEN;
   
-//   printf("DNS: Request host='%s' type=%i class=%i\n", name, typ, cls);
+   printf("DNS: Request host='%s' type=%i class=%i\n", name, typ, cls);
   
   // calculate max size of authority section
   
@@ -303,7 +304,7 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
     write_record_soa(&newpos, outend, "", offset, CLASS_IN, opt->nsttl, opt->ns, opt->mbox, time(NULL), 604800, 86400, 2592000, 604800);
     if (max_auth_size < newpos - outpos)
         max_auth_size = newpos - outpos;
-//    printf("Authority section will claim %i bytes max\n", max_auth_size);
+    printf("Authority section will claim %i bytes max\n", max_auth_size);
   }
   
   // Answer section
@@ -313,14 +314,14 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   // NS records
   if ((typ == TYPE_NS || typ == QTYPE_ANY) && (cls == CLASS_IN || cls == QCLASS_ANY)) {
     int ret2 = write_record_ns(&outpos, outend - max_auth_size, "", offset, CLASS_IN, opt->nsttl, opt->ns);
-//    printf("wrote NS record: %i\n", ret2);
+    printf("wrote NS record: %i\n", ret2);
     if (!ret2) { outbuf[7]++; have_ns++; }
   }
 
   // SOA records
   if ((typ == TYPE_SOA || typ == QTYPE_ANY) && (cls == CLASS_IN || cls == QCLASS_ANY) && opt->mbox) {
     int ret2 = write_record_soa(&outpos, outend - max_auth_size, "", offset, CLASS_IN, opt->nsttl, opt->ns, opt->mbox, time(NULL), 604800, 86400, 2592000, 604800);
-//    printf("wrote SOA record: %i\n", ret2);
+    printf("wrote SOA record: %i\n", ret2);
     if (!ret2) { outbuf[7]++; }
   }
   
@@ -328,6 +329,7 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   if ((typ == TYPE_A || typ == TYPE_AAAA || typ == QTYPE_ANY) && (cls == CLASS_IN || cls == QCLASS_ANY)) {
     addr_t addr[32];
     int naddr = opt->cb((void*)opt, name, addr, 32, typ == TYPE_A || typ == QTYPE_ANY, typ == TYPE_AAAA || typ == QTYPE_ANY);
+    printf("A/AAAA count = %i\n", naddr);
     int n = 0;
     while (n < naddr) {
       int ret = 1;
@@ -335,7 +337,7 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
          ret = write_record_a(&outpos, outend - max_auth_size, "", offset, CLASS_IN, opt->datattl, &addr[n]);
       else if (addr[n].v == 6)
          ret = write_record_aaaa(&outpos, outend - max_auth_size, "", offset, CLASS_IN, opt->datattl, &addr[n]);
-//      printf("wrote A record: %i\n", ret);
+      printf("wrote A[%i] record: %i\n", n, ret);
       if (!ret) {
         n++;
         outbuf[7]++;
@@ -347,7 +349,7 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   // Authority section
   if (!have_ns && outbuf[7]) {
     int ret2 = write_record_ns(&outpos, outend, "", offset, CLASS_IN, opt->nsttl, opt->ns);
-//    printf("wrote NS record: %i\n", ret2);
+    printf("wrote NS record: %i\n", ret2);
     if (!ret2) {
       outbuf[9]++;
     }
@@ -358,7 +360,7 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
     // referral loop, as the NS response indicates where the resolver should
     // try next.
     int ret2 = write_record_soa(&outpos, outend, "", offset, CLASS_IN, opt->nsttl, opt->ns, opt->mbox, time(NULL), 604800, 86400, 2592000, 604800);
-//    printf("wrote SOA record: %i\n", ret2);
+    printf("wrote SOA record: %i\n", ret2);
     if (!ret2) { outbuf[9]++; }
   }
   
@@ -367,6 +369,7 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   
   return outpos - outbuf;
 error:
+  printf("ERROR = %i\n", error);
   // set error
   outbuf[3] |= error & 0xF;
   // set counts
@@ -380,31 +383,31 @@ error:
 static int listenSocket = -1;
 
 int dnsserver(dns_opt_t *opt) {
-  struct sockaddr_in6 si_other;
+  struct sockaddr_in si_other;
   int senderSocket = -1;
-  senderSocket = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+  senderSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (senderSocket == -1) 
     return -3;
 
   int replySocket;
   if (listenSocket == -1) {
-    struct sockaddr_in6 si_me;
-    if ((listenSocket=socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP))==-1) {
+    struct sockaddr_in si_me;
+    if ((listenSocket=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1) {
       listenSocket = -1;
       return -1;
     }
-    replySocket = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+    replySocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (replySocket == -1)
     {
       close(listenSocket);
       return -1;
     }
     int sockopt = 1;
-    setsockopt(listenSocket, IPPROTO_IPV6, DSTADDR_SOCKOPT, &sockopt, sizeof sockopt);
+    /*setsockopt(listenSocket, IPPROTO_IPV6, DSTADDR_SOCKOPT, &sockopt, sizeof sockopt);*/
     memset((char *) &si_me, 0, sizeof(si_me));
-    si_me.sin6_family = AF_INET6;
-    si_me.sin6_port = htons(opt->port);
-    si_me.sin6_addr = in6addr_any;
+    si_me.sin_family = AF_INET;
+    si_me.sin_port = htons(opt->port);
+    si_me.sin_addr.s_addr = INADDR_ANY;
     if (bind(listenSocket, (struct sockaddr*)&si_me, sizeof(si_me))==-1)
       return -2;
   }
@@ -428,8 +431,8 @@ int dnsserver(dns_opt_t *opt) {
   for (; 1; ++(opt->nRequests))
   {
     ssize_t insize = recvmsg(listenSocket, &msg, 0);
-//    unsigned char *addr = (unsigned char*)&si_other.sin_addr.s_addr;
-//    printf("DNS: Request %llu from %i.%i.%i.%i:%i of %i bytes\n", (unsigned long long)(opt->nRequests), addr[0], addr[1], addr[2], addr[3], ntohs(si_other.sin_port), (int)insize);
+    unsigned char *addr = (unsigned char*)&si_other.sin_addr.s_addr;
+    printf("DNS: Request %llu from %i.%i.%i.%i:%i of %i bytes\n", (unsigned long long)(opt->nRequests), addr[0], addr[1], addr[2], addr[3], ntohs(si_other.sin_port), (int)insize);
     if (insize <= 0)
       continue;
 
