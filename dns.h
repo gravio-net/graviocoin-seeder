@@ -18,6 +18,8 @@ typedef struct {
   const char *host;
   const char *ns;
   const char *mbox;
+  const char *base_domain;
+  const char *base_ip;
   int (*cb)(void *opt, char *requested_hostname, addr_t *addr, int max, int ipv4, int ipv6);
   // stats
   uint64_t nRequests;

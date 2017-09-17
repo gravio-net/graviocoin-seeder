@@ -265,11 +265,12 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   char name[256] = {0};
   int offset = inpos - inbuf;
   int ret = parse_name(&inpos, inend, inbuf, name, 256);
-  printf("DNS: PRE-request host='%s' opt-host='%s'\n", name, opt->host);
+  printf("DNS: PRE-request host='%s' opt-host='%s' base-domain='%s' ret=%i\n", name, opt->host, opt->base_domain, ret);
   if (ret == -1) { error = 1; goto error; }
   if (ret == -2) { error = 5; goto error; }
   int namel = strlen(name), hostl = strlen(opt->host);
-  if (strcasecmp(name, opt->host) && (namel<hostl+2 || name[namel-hostl-1]!='.' || strcasecmp(name+namel-hostl,opt->host))) { error = 5; goto error; }
+  int baserq = strcasecmp(name, opt->base_domain);
+  if (baserq && strcasecmp(name, opt->host) && (namel<hostl+2 || name[namel-hostl-1]!='.' || strcasecmp(name+namel-hostl,opt->host))) { error = 5; goto error; }
   if (inend - inpos < 4) { error = 1; goto error; }
   // copy question to output
   memcpy(outbuf+12, inbuf+12, inpos+4 - (inbuf+12));
@@ -328,24 +329,48 @@ ssize_t static dnshandle(dns_opt_t *opt, const unsigned char *inbuf, size_t insi
   // A/AAAA records
   if ((typ == TYPE_A || typ == TYPE_AAAA || typ == QTYPE_ANY) && (cls == CLASS_IN || cls == QCLASS_ANY)) {
     addr_t addr[32];
-    int naddr = opt->cb((void*)opt, name, addr, 32, typ == TYPE_A || typ == QTYPE_ANY, typ == TYPE_AAAA || typ == QTYPE_ANY);
-    printf("A/AAAA count = %i\n", naddr);
-    int n = 0;
-    while (n < naddr) {
-      int ret = 1;
-      if (addr[n].v == 4)
-         ret = write_record_a(&outpos, outend - max_auth_size, "", offset, CLASS_IN, opt->datattl, &addr[n]);
-      else if (addr[n].v == 6)
-         ret = write_record_aaaa(&outpos, outend - max_auth_size, "", offset, CLASS_IN, opt->datattl, &addr[n]);
-      printf("-> wrote A[%i] record: %i\n", n, ret);
-      if (!ret) {
-        n++;
-        outbuf[7]++;
-      } else
-        break;
+
+    if (!baserq)
+    {
+       addr_t addr_domain;
+       addr_domain.v = 4;
+
+       int lIdx = 0, lLen = strlen(opt->base_ip), lPartIdx = 0, lQ = 0;
+       char lPart[3] = {0};
+       for(lIdx = 0; lIdx < lLen; lIdx++)
+       {
+          if (opt->base_ip[lIdx] != '.') lPart[lPartIdx++] = opt->base_ip[lIdx];
+          else
+          {
+             addr_domain.data.v4[lQ++] = atoi(lPart);
+          }
+       }
+
+       printf("A/AAAA count = 1\n");
+       ret = write_record_a(&outpos, outend - max_auth_size, "", offset, CLASS_IN, opt->datattl, &addr_domain);
+       printf("-> wrote A record: %i\n", ret);
     }
+    else
+    {
+       int naddr = opt->cb((void*)opt, name, addr, 32, typ == TYPE_A || typ == QTYPE_ANY, typ == TYPE_AAAA || typ == QTYPE_ANY);
+       printf("A/AAAA count = %i\n", naddr);
+       int n = 0;
+       while (n < naddr) {
+         int ret = 1;
+         if (addr[n].v == 4)
+            ret = write_record_a(&outpos, outend - max_auth_size, "", offset, CLASS_IN, opt->datattl, &addr[n]);
+         else if (addr[n].v == 6)
+            ret = write_record_aaaa(&outpos, outend - max_auth_size, "", offset, CLASS_IN, opt->datattl, &addr[n]);
+         printf("-> wrote A[%i] record: %i\n", n, ret);
+         if (!ret) {
+           n++;
+           outbuf[7]++;
+         } else
+           break;
+       }
+     }
   }
-  
+
   // Authority section
   if (!have_ns && outbuf[7]) {
     int ret2 = write_record_ns(&outpos, outend, "", offset, CLASS_IN, opt->nsttl, opt->ns);

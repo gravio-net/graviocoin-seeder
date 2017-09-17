@@ -27,6 +27,8 @@ public:
   const char *mbox;
   const char *ns;
   const char *host;
+  const char *base_domain;
+  const char *base_ip;
   const char *tor;
   const char *ipv4_proxy;
   const char *ipv6_proxy;
@@ -41,6 +43,8 @@ public:
                               "Options:\n"
                               "-h <host>       Hostname of the DNS seed\n"
                               "-n <ns>         Hostname of the nameserver\n"
+                              "-b <domain>     Domain\n"
+                              "-a <ip>         Domain IPV4 address\n"
                               "-m <mbox>       E-Mail address reported in SOA records\n"
                               "-t <threads>    Number of crawlers to run in parallel (default 96)\n"
                               "-d <threads>    Number of DNS server threads (default 4)\n"
@@ -61,6 +65,8 @@ public:
         {"host", required_argument, 0, 'h'},
         {"ns",   required_argument, 0, 'n'},
         {"mbox", required_argument, 0, 'm'},
+        {"domain", required_argument, 0, 'b'},
+        {"domainip", required_argument, 0, 'a'},
         {"threads", required_argument, 0, 't'},
         {"dnsthreads", required_argument, 0, 'd'},
         {"port", required_argument, 0, 'p'},
@@ -75,24 +81,34 @@ public:
         {0, 0, 0, 0}
       };
       int option_index = 0;
-      int c = getopt_long(argc, argv, "h:n:m:t:p:d:o:i:k:w:?", long_options, &option_index);
+      int c = getopt_long(argc, argv, "h:n:b:a:m:t:p:d:o:i:k:w:?", long_options, &option_index);
       if (c == -1) break;
       switch (c) {
         case 'h': {
           host = optarg;
           break;
         }
-        
+
         case 'm': {
           mbox = optarg;
           break;
         }
-        
+
+        case 'b': {
+          base_domain = optarg;
+          break;
+        }
+
+        case 'a': {
+          base_ip = optarg;
+          break;
+        }
+
         case 'n': {
           ns = optarg;
           break;
         }
-        
+
         case 't': {
           int n = strtol(optarg, NULL, 10);
           if (n > 0 && n < 1000) nThreads = n;
@@ -255,6 +271,8 @@ public:
   CDnsThread(CDnsSeedOpts* opts, int idIn) : id(idIn) {
     dns_opt.host = opts->host;
     dns_opt.ns = opts->ns;
+    dns_opt.base_domain = opts->base_domain;
+    dns_opt.base_ip = opts->base_ip;
     dns_opt.mbox = opts->mbox;
     dns_opt.datattl = 3600;
     dns_opt.nsttl = 40000;
